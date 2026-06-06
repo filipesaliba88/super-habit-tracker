@@ -5,8 +5,8 @@ import "./globals.css";
 const inter = Inter({ subsets: ["latin"] });
 
 export const metadata: Metadata = {
-  title: "HabitFlow — Rastreador de Hábitos",
-  description: "Desenvolva disciplina e novos hábitos com o HabitFlow.",
+  title: "Hábito+ — Rastreador de Hábitos",
+  description: "Desenvolva disciplina e novos hábitos com o Hábito+.",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

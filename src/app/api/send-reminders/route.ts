@@ -40,7 +40,7 @@ export async function GET(req: NextRequest) {
     const habitList = habits.map((h) => `${h.icon} ${h.name}`).join('<br/>')
 
     await resend.emails.send({
-      from: 'HabitFlow <noreply@habitflow.app>',
+      from: 'Hábito+ <noreply@habitflow.app>',
       to: profile.email,
       subject: `🔥 Seus hábitos de hoje — ${today}`,
       html: `
@@ -52,7 +52,7 @@ export async function GET(req: NextRequest) {
           </div>
           <a href="${process.env.NEXT_PUBLIC_APP_URL}/dashboard"
              style="display: inline-block; background: #6366f1; color: white; padding: 12px 24px; border-radius: 10px; text-decoration: none; font-weight: 600;">
-            Abrir HabitFlow
+            Abrir Hábito+
           </a>
           <p style="color: #9ca3af; font-size: 12px; margin-top: 24px;">
             Para parar de receber lembretes, acesse Configurações no app.

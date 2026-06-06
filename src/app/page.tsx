@@ -8,7 +8,7 @@ export default function Home() {
       <nav className="flex items-center justify-between px-6 py-4 max-w-6xl mx-auto">
         <div className="flex items-center gap-2 font-bold text-xl text-indigo-600">
           <Flame className="w-6 h-6" />
-          HabitFlow
+          Hábito+
         </div>
         <div className="flex gap-4">
           <Link href="/login" className="text-gray-600 hover:text-gray-900 px-4 py-2 text-sm font-medium">
@@ -31,7 +31,7 @@ export default function Home() {
           <span className="text-indigo-600">duram para sempre</span>
         </h1>
         <p className="text-xl text-gray-500 max-w-2xl mx-auto mb-10">
-          O HabitFlow te ajuda a criar disciplina através do acompanhamento diário de hábitos,
+          O Hábito+ te ajuda a criar disciplina através do acompanhamento diário de hábitos,
           streaks motivadores e lembretes inteligentes.
         </p>
         <div className="flex flex-col sm:flex-row gap-4 justify-center">
@@ -112,7 +112,7 @@ export default function Home() {
 
       {/* Footer */}
       <footer className="py-8 text-center text-gray-400 text-sm border-t border-gray-100">
-        © {new Date().getFullYear()} HabitFlow. Todos os direitos reservados.
+        © {new Date().getFullYear()} Hábito+. Todos os direitos reservados.
       </footer>
     </div>
   )

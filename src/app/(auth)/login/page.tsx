@@ -37,7 +37,7 @@ export default function LoginPage() {
         <div className="text-center mb-8">
           <Link href="/" className="inline-flex items-center gap-2 text-indigo-600 font-bold text-2xl mb-2">
             <Flame className="w-7 h-7" />
-            HabitFlow
+            Hábito+
           </Link>
           <p className="text-gray-500 mt-2">Entre na sua conta</p>
         </div>
