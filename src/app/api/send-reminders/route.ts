@@ -5,7 +5,7 @@ import { format } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 
 export async function GET(req: NextRequest) {
-  const resend = new Resend(process.env.RESEND_API_KEY)
+  const resend = new Resend(process.env.RESEND_API_KEY ?? 're_placeholder')
   // Protect with a secret token (call this from a cron job)
   const token = req.nextUrl.searchParams.get('token')
   if (token !== process.env.WEBHOOK_SECRET) {
