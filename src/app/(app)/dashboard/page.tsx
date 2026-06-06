@@ -4,26 +4,12 @@ import { ptBR } from 'date-fns/locale'
 import HabitList from '@/components/HabitList'
 import AddHabitButton from '@/components/AddHabitButton'
 import StatsCards from '@/components/StatsCards'
-import { DEFAULT_HABITS } from '@/lib/defaultHabits'
-
 export default async function DashboardPage() {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
-  const today = format(new Date(), 'yyyy-MM-dd')
-
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('onboarded')
-    .eq('id', user!.id)
-    .single()
-
-  if (!profile?.onboarded) {
-    await supabase.from('profiles').update({ onboarded: true }).eq('id', user!.id)
-    await supabase.from('habits').insert(
-      DEFAULT_HABITS.map((h) => ({ ...h, user_id: user!.id }))
-    )
-  }
+  const nowBR = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
+  const today = format(nowBR, 'yyyy-MM-dd')
 
   const { data: habits } = await supabase
     .from('habits')

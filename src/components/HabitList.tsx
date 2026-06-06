@@ -1,10 +1,11 @@
 'use client'
 
-import { useState, useTransition } from 'react'
+import { useState, useTransition, useCallback } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { useRouter } from 'next/navigation'
 import { CheckCircle, Circle, Trash2, Pencil, ChevronDown, ChevronUp } from 'lucide-react'
 import EditHabitModal from './EditHabitModal'
+import Toast, { ToastData } from './Toast'
 
 interface Habit {
   id: string
@@ -24,15 +25,72 @@ interface Props {
   userId: string
 }
 
+const STREAK_MILESTONES = [3, 7, 14, 21, 30, 60, 90]
+
+function getStartOfWeek(dateStr: string): string {
+  const d = new Date(dateStr + 'T12:00:00')
+  const day = d.getDay()
+  const diff = d.getDate() - day + (day === 0 ? -6 : 1)
+  d.setDate(diff)
+  return d.toISOString().split('T')[0]
+}
+
 export default function HabitList({ habits, checkedIds, checkinNotes, today, userId }: Props) {
   const router = useRouter()
-  const [pending, startTransition] = useTransition()
+  const [, startTransition] = useTransition()
   const [localChecked, setLocalChecked] = useState<Set<string>>(new Set(checkedIds))
   const [notes, setNotes] = useState<Record<string, string>>(checkinNotes)
   const [expandedNote, setExpandedNote] = useState<string | null>(null)
   const [editingHabit, setEditingHabit] = useState<Habit | null>(null)
+  const [toasts, setToasts] = useState<ToastData[]>([])
 
   const supabase = createClient()
+
+  const addToast = useCallback((toast: Omit<ToastData, 'id'>) => {
+    const id = Math.random().toString(36).slice(2)
+    setToasts((prev) => [...prev, { ...toast, id }])
+  }, [])
+
+  const removeToast = useCallback((id: string) => {
+    setToasts((prev) => prev.filter((t) => t.id !== id))
+  }, [])
+
+  async function calculateStreak(habitId: string): Promise<number> {
+    const { data } = await supabase
+      .from('checkins')
+      .select('checked_date')
+      .eq('habit_id', habitId)
+      .eq('user_id', userId)
+      .order('checked_date', { ascending: false })
+      .limit(120)
+
+    if (!data?.length) return 1
+
+    let streak = 1
+    const sorted = data.map((c) => c.checked_date).sort().reverse()
+
+    for (let i = 0; i < sorted.length - 1; i++) {
+      const curr = new Date(sorted[i] + 'T12:00:00')
+      const prev = new Date(sorted[i + 1] + 'T12:00:00')
+      const diff = (curr.getTime() - prev.getTime()) / (1000 * 60 * 60 * 24)
+      if (diff === 1) streak++
+      else break
+    }
+
+    return streak
+  }
+
+  async function getWeeklyCount(habitId: string): Promise<number> {
+    const weekStart = getStartOfWeek(today)
+    const { count } = await supabase
+      .from('checkins')
+      .select('id', { count: 'exact' })
+      .eq('habit_id', habitId)
+      .eq('user_id', userId)
+      .gte('checked_date', weekStart)
+      .lte('checked_date', today)
+    return count ?? 0
+  }
 
   async function toggle(habitId: string) {
     const isChecked = localChecked.has(habitId)
@@ -47,12 +105,49 @@ export default function HabitList({ habits, checkedIds, checkinNotes, today, use
       next.add(habitId)
       setLocalChecked(next)
       setExpandedNote(habitId)
+
       await supabase.from('checkins').insert({
         habit_id: habitId,
         user_id: userId,
         checked_date: today,
         note: notes[habitId] ?? null,
       })
+
+      const habit = habits.find((h) => h.id === habitId)!
+
+      // Verifica streak
+      const streak = await calculateStreak(habitId)
+      if (STREAK_MILESTONES.includes(streak)) {
+        addToast({
+          type: 'streak',
+          emoji: '🔥',
+          message: `${streak} dias seguidos de "${habit.name}"! Continue assim!`,
+        })
+      }
+
+      // Verifica meta semanal
+      if (habit.frequency === 'weekly') {
+        const weeklyCount = await getWeeklyCount(habitId)
+        if (weeklyCount === habit.target_days) {
+          addToast({
+            type: 'weekly',
+            emoji: '🏆',
+            message: `Meta semanal de "${habit.name}" atingida! ${habit.target_days}x essa semana!`,
+          })
+        }
+      }
+
+      // Verifica se completou todos os hábitos do dia
+      const allDone = habits.every((h) => h.id === habitId || next.has(h.id))
+      if (allDone && habits.length > 0) {
+        setTimeout(() => {
+          addToast({
+            type: 'complete',
+            emoji: '🎉',
+            message: `Incrível! Você completou todos os ${habits.length} hábitos de hoje!`,
+          })
+        }, 600)
+      }
     }
 
     startTransition(() => router.refresh())
@@ -83,6 +178,8 @@ export default function HabitList({ habits, checkedIds, checkinNotes, today, use
 
   return (
     <>
+      <Toast toasts={toasts} onRemove={removeToast} />
+
       <div className="space-y-3">
         {habits.map((habit) => {
           const checked = localChecked.has(habit.id)
@@ -96,10 +193,8 @@ export default function HabitList({ habits, checkedIds, checkinNotes, today, use
               }`}
             >
               <div className="flex items-center gap-4 p-4">
-                {/* Checkbox */}
                 <button
                   onClick={() => toggle(habit.id)}
-                  disabled={pending}
                   className="flex-shrink-0 transition-transform hover:scale-110"
                 >
                   {checked ? (
@@ -109,7 +204,6 @@ export default function HabitList({ habits, checkedIds, checkinNotes, today, use
                   )}
                 </button>
 
-                {/* Ícone */}
                 <div
                   className="w-10 h-10 rounded-xl flex items-center justify-center text-xl flex-shrink-0"
                   style={{ backgroundColor: habit.color + '20' }}
@@ -117,7 +211,6 @@ export default function HabitList({ habits, checkedIds, checkinNotes, today, use
                   {habit.icon}
                 </div>
 
-                {/* Info */}
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2">
                     <p className={`font-semibold text-gray-900 ${checked ? 'line-through text-gray-400' : ''}`}>
@@ -139,13 +232,11 @@ export default function HabitList({ habits, checkedIds, checkinNotes, today, use
                   )}
                 </div>
 
-                {/* Ações */}
                 <div className="flex items-center gap-1 flex-shrink-0">
                   {checked && (
                     <button
                       onClick={() => setExpandedNote(noteOpen ? null : habit.id)}
                       className="text-gray-300 hover:text-indigo-400 transition-colors p-1"
-                      title="Adicionar nota"
                     >
                       {noteOpen ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                     </button>
@@ -153,23 +244,20 @@ export default function HabitList({ habits, checkedIds, checkinNotes, today, use
                   <button
                     onClick={() => setEditingHabit(habit)}
                     className="text-gray-300 hover:text-indigo-400 transition-colors p-1"
-                    title="Editar"
                   >
                     <Pencil className="w-4 h-4" />
                   </button>
                   <button
                     onClick={() => deleteHabit(habit.id)}
                     className="text-gray-300 hover:text-red-400 transition-colors p-1"
-                    title="Excluir"
                   >
                     <Trash2 className="w-4 h-4" />
                   </button>
                 </div>
               </div>
 
-              {/* Nota diária */}
               {checked && noteOpen && (
-                <div className="px-4 pb-4 pt-0">
+                <div className="px-4 pb-4">
                   <div className="flex gap-2">
                     <input
                       type="text"

@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server'
-import { subDays, format, eachDayOfInterval, parseISO, isValid } from 'date-fns'
+import { subDays, format, eachDayOfInterval, parseISO, isValid, startOfWeek, eachWeekOfInterval } from 'date-fns'
 import { ptBR } from 'date-fns/locale'
 import { Suspense } from 'react'
 import PeriodSelector from '@/components/PeriodSelector'
@@ -12,7 +12,7 @@ export default async function ProgressPage({
   searchParams: Promise<{ period?: string; from?: string; to?: string }>
 }) {
   const params = await searchParams
-  const today = new Date()
+  const today = new Date(new Date().toLocaleString('en-US', { timeZone: 'America/Sao_Paulo' }))
 
   let startDate: Date
   let endDate: Date
@@ -41,7 +41,7 @@ export default async function ProgressPage({
 
   const { data: habits } = await supabase
     .from('habits')
-    .select('id, name, icon, color')
+    .select('id, name, icon, color, frequency, target_days')
     .eq('user_id', user!.id)
     .eq('is_active', true)
 
@@ -54,9 +54,9 @@ export default async function ProgressPage({
 
   const days = eachDayOfInterval({ start: startDate, end: endDate })
   const checkinSet = new Set(checkins?.map((c) => `${c.habit_id}:${c.checked_date}`) ?? [])
-  const totalDays = days.length
 
-  function getStreak(habitId: string): number {
+  // Streak diário
+  function getDailyStreak(habitId: string): number {
     let streak = 0
     for (let i = 0; i < days.length; i++) {
       const d = format(subDays(today, i), 'yyyy-MM-dd')
@@ -64,6 +64,47 @@ export default async function ProgressPage({
       else break
     }
     return streak
+  }
+
+  // Streak semanal — quantas semanas consecutivas bateu a meta
+  function getWeeklyStreak(habitId: string, targetDays: number): number {
+    const weeks = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 1 })
+      .reverse()
+
+    let streak = 0
+    for (const weekStart of weeks) {
+      const weekDays = eachDayOfInterval({
+        start: weekStart,
+        end: subDays(new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000), 1),
+      }).filter((d) => d <= endDate && d >= startDate)
+
+      const count = weekDays.filter((d) =>
+        checkinSet.has(`${habitId}:${format(d, 'yyyy-MM-dd')}`)
+      ).length
+
+      if (count >= targetDays) streak++
+      else break
+    }
+    return streak
+  }
+
+  // % para hábito semanal: semanas que bateu a meta / total de semanas
+  function getWeeklyPct(habitId: string, targetDays: number): { done: number; total: number; pct: number } {
+    const weeks = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 1 })
+    let done = 0
+    for (const weekStart of weeks) {
+      const weekDays = eachDayOfInterval({
+        start: weekStart,
+        end: subDays(new Date(weekStart.getTime() + 7 * 24 * 60 * 60 * 1000), 1),
+      }).filter((d) => d <= endDate && d >= startDate)
+
+      const count = weekDays.filter((d) =>
+        checkinSet.has(`${habitId}:${format(d, 'yyyy-MM-dd')}`)
+      ).length
+
+      if (count >= targetDays) done++
+    }
+    return { done, total: weeks.length, pct: Math.round((done / weeks.length) * 100) }
   }
 
   const startStr = format(startDate, 'yyyy-MM-dd')
@@ -78,7 +119,7 @@ export default async function ProgressPage({
             {format(startDate, "d 'de' MMM", { locale: ptBR })} →{' '}
             {format(endDate, "d 'de' MMM", { locale: ptBR })}
             {isCustom && (
-              <span className="ml-2 text-indigo-500 font-medium">({totalDays} dias)</span>
+              <span className="ml-2 text-indigo-500 font-medium">({days.length} dias)</span>
             )}
           </p>
         </div>
@@ -92,11 +133,72 @@ export default async function ProgressPage({
       ) : (
         <div className="space-y-6">
           {(habits ?? []).map((habit) => {
-            const streak = getStreak(habit.id)
+            const isWeekly = habit.frequency === 'weekly'
+
+            if (isWeekly) {
+              const { done, total, pct } = getWeeklyPct(habit.id, habit.target_days)
+              const streak = getWeeklyStreak(habit.id, habit.target_days)
+
+              return (
+                <div key={habit.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+                  <div className="flex items-center justify-between mb-4">
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-10 h-10 rounded-xl flex items-center justify-center text-xl"
+                        style={{ backgroundColor: habit.color + '20' }}
+                      >
+                        {habit.icon}
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <p className="font-semibold text-gray-900">{habit.name}</p>
+                          <span className="text-xs bg-orange-100 text-orange-600 px-2 py-0.5 rounded-full font-medium">
+                            {habit.target_days}x/sem
+                          </span>
+                        </div>
+                        <p className="text-xs text-gray-400">
+                          {done}/{total} semanas com meta batida • {pct}% de conclusão
+                        </p>
+                      </div>
+                    </div>
+                    <div className="text-right">
+                      <p className="text-2xl font-bold" style={{ color: habit.color }}>
+                        🏆 {streak}
+                      </p>
+                      <p className="text-xs text-gray-400">semanas seguidas</p>
+                    </div>
+                  </div>
+
+                  {/* Heatmap por dia */}
+                  <div className="flex gap-1 flex-wrap">
+                    {days.map((day) => {
+                      const dateStr = format(day, 'yyyy-MM-dd')
+                      const done = checkinSet.has(`${habit.id}:${dateStr}`)
+                      const label = format(day, "d 'de' MMMM", { locale: ptBR })
+                      return (
+                        <div
+                          key={dateStr}
+                          title={`${label} — ${done ? 'Feito ✅' : 'Não feito'}`}
+                          className="w-6 h-6 rounded-md cursor-default"
+                          style={{ backgroundColor: done ? habit.color : '#f3f4f6', opacity: done ? 1 : 0.6 }}
+                        />
+                      )
+                    })}
+                  </div>
+
+                  <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                    <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: habit.color }} />
+                  </div>
+                </div>
+              )
+            }
+
+            // Hábito diário
             const total = days.filter((d) =>
               checkinSet.has(`${habit.id}:${format(d, 'yyyy-MM-dd')}`)
             ).length
-            const pct = Math.round((total / totalDays) * 100)
+            const pct = Math.round((total / days.length) * 100)
+            const streak = getDailyStreak(habit.id)
 
             return (
               <div key={habit.id} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -111,7 +213,7 @@ export default async function ProgressPage({
                     <div>
                       <p className="font-semibold text-gray-900">{habit.name}</p>
                       <p className="text-xs text-gray-400">
-                        {total}/{totalDays} dias • {pct}% de conclusão
+                        {total}/{days.length} dias • {pct}% de conclusão
                       </p>
                     </div>
                   </div>
@@ -123,7 +225,6 @@ export default async function ProgressPage({
                   </div>
                 </div>
 
-                {/* Heatmap */}
                 <div className="flex gap-1 flex-wrap">
                   {days.map((day) => {
                     const dateStr = format(day, 'yyyy-MM-dd')
@@ -134,21 +235,14 @@ export default async function ProgressPage({
                         key={dateStr}
                         title={`${label} — ${done ? 'Feito ✅' : 'Não feito'}`}
                         className="w-6 h-6 rounded-md cursor-default"
-                        style={{
-                          backgroundColor: done ? habit.color : '#f3f4f6',
-                          opacity: done ? 1 : 0.6,
-                        }}
+                        style={{ backgroundColor: done ? habit.color : '#f3f4f6', opacity: done ? 1 : 0.6 }}
                       />
                     )
                   })}
                 </div>
 
-                {/* Barra de progresso */}
                 <div className="mt-3 h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                  <div
-                    className="h-full rounded-full transition-all"
-                    style={{ width: `${pct}%`, backgroundColor: habit.color }}
-                  />
+                  <div className="h-full rounded-full" style={{ width: `${pct}%`, backgroundColor: habit.color }} />
                 </div>
               </div>
             )
