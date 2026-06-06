@@ -43,16 +43,6 @@ export default function SettingsForm({ profile, userId }: Props) {
 
   return (
     <div className="space-y-6">
-      {profile?.has_access ? (
-        <div className="bg-green-50 border border-green-200 rounded-xl p-4 text-sm text-green-700 font-medium">
-          ✅ Acesso vitalício ativo
-        </div>
-      ) : (
-        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 text-sm text-amber-700">
-          <p className="font-semibold mb-1">Conta sem acesso ativo</p>
-          <p>Adquira o acesso vitalício na plataforma de venda para desbloquear todos os recursos.</p>
-        </div>
-      )}
 
       <form onSubmit={handleSave} className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 space-y-5">
         <h2 className="font-semibold text-gray-900">Perfil</h2>

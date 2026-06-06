@@ -62,12 +62,6 @@ export default function Sidebar({ user, profile }: Props) {
       </nav>
 
       <div className="p-4 border-t border-gray-100">
-        {!profile?.has_access && (
-          <div className="bg-indigo-50 rounded-xl p-3 mb-3 text-xs text-indigo-700">
-            <p className="font-semibold mb-1">Conta gratuita</p>
-            <p>Ative o acesso completo para desbloquear todas as funcionalidades.</p>
-          </div>
-        )}
         <div className="flex items-center gap-2 mb-3">
           <div className="w-8 h-8 bg-indigo-100 rounded-full flex items-center justify-center text-indigo-600 font-bold text-sm">
             {(profile?.full_name ?? user.email ?? '?')[0].toUpperCase()}
