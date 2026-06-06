@@ -2,7 +2,7 @@
 
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
-import { Flame, LayoutDashboard, BarChart3, BookOpen, Settings, LogOut } from 'lucide-react'
+import { Flame, LayoutDashboard, BarChart3, BookOpen, PieChart, Settings, LogOut } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import type { User } from '@supabase/supabase-js'
 
@@ -29,6 +29,7 @@ export default function Sidebar({ user, profile }: Props) {
 
   const links = [
     { href: '/dashboard', label: 'Hoje', icon: LayoutDashboard },
+    { href: '/stats', label: 'Estatísticas', icon: PieChart },
     { href: '/progress', label: 'Progresso', icon: BarChart3 },
     { href: '/diary', label: 'Diário', icon: BookOpen },
     { href: '/settings', label: 'Configurações', icon: Settings },
